@@ -2,7 +2,7 @@ import pandas as pd;
 import pprint;
 import random;
 import numpy as np;
-league='Serie A'
+league='Premier League'
 year='2019'
 with open('Data/Fixture Data of '+league+' '+year+'.csv')as file:
     data=pd.read_csv(file,header=None)
@@ -55,7 +55,12 @@ with open('Data/FinalData/'+league+' '+year+'Gu clear N.csv','w')as file:
 with open('Data/FinalData/'+league+' '+year+'Gu clear N.csv')as file:
     data4=pd.read_csv(file,header=None)
     file.close()
-pprint.pprint(data4)#之后还要手动把角球数和进球数粘上去
+a=0
+for i in range(data4.shape[0]):
+    if(np.isnan(data4.values[i][71])):
+        a+=1
+print(a)
+
 
 
 '''

@@ -2,17 +2,21 @@ import tensorflow as tf;
 import pandas as pd;
 import pprint
 import numpy as np;
-league='Serie A'
+league='Premier League'
 homemodel=tf.keras.models.load_model('/Users/kiddgu/PycharmProjects/CornerPrediction/AIhome Zscore.h5')
 awaymodel=tf.keras.models.load_model('/Users/kiddgu/PycharmProjects/CornerPrediction/AIaway.h5')
 totalmodel=tf.keras.models.load_model('/Users/kiddgu/PycharmProjects/CornerPrediction/AItotal Zscore.h5')
 minusmodel=tf.keras.models.load_model('/Users/kiddgu/PycharmProjects/CornerPrediction/AIminus.h5')
-totalgoalmodel=tf.keras.models.load_model('/Users/kiddgu/PycharmProjects/CornerPrediction/AItotalgoal(l1l2=0.2).h5')
+totalgoalmodel=tf.keras.models.load_model('/Users/kiddgu/PycharmProjects/CornerPrediction/AItotalgoal Zscore.h5')
 
-Teams=np.array([['Atalanta','AC Milan'],
-                ['Lecce','Bologna'],
-                ['Parma','Brescia'],
-                ['Sassuolo','Napoli']])
+Teams=np.array([['Tottenham','Brighton']])
+with open('/Users/kiddgu/PycharmProjects/CornerPrediction/Data/Fixture Data of '+league+' 2019.csv')as file:
+    temp=pd.read_csv(file,header=None)
+    file.close()
+temp.dropna(axis=0,how='any',inplace=True)
+with open('/Users/kiddgu/PycharmProjects/CornerPrediction/Data/Fixture Data of '+league+' 2019 clear.csv','w')as file:
+    temp.to_csv(file,header=None,index=None)
+    file.close()
 with open('/Users/kiddgu/PycharmProjects/CornerPrediction/Data/Fixture Data of '+league+' 2019 clear.csv')as file:
     origin=pd.read_csv(file,header=None)
     file.close()

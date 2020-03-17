@@ -4,12 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import VarianceThreshold
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_regression
 import csv, ast
 import time, os, sys
 import pprint;
 dir = os.getcwd()
 data_dir = dir + "/Data"
 league=['Bundesliga 1','Ligue 1','Premier League','Primera Division','Serie A']
+numfeature=30
 
 def splitdata():
     global league
@@ -38,27 +41,25 @@ def splitdata():
             traindata=np.concatenate((traindata,temp2016.values),axis=0)
             file.close()
     train_sample=traindata.copy()
-    a=VarianceThreshold(threshold=0.07).fit_transform(train_sample)
-    pprint.pprint(a)
-    pprint.pprint(a.shape)
     np.random.shuffle(train_sample)
     test_sample,cv_sample=train_test_split(data2019,train_size=0.5,shuffle=True,random_state=0)
 
-    train_sample_y_corner=train_sample[:,[68,69]].copy()
-    cv_sample_y_corner=cv_sample[:,[68,69]].copy()
-    test_sample_y_corner=test_sample[:,[68,69]].copy()
-    train_sample_y_goal=train_sample[:,[70,71]].copy()
-    cv_sample_y_goal=cv_sample[:,[70,71]].copy()
-    test_sample_y_goal=test_sample[:,[70,71]].copy()
-    train_sample_x=train_sample[:,0:68].copy()
-    cv_sample_x=cv_sample[:,0:68].copy()
-    test_sample_x=test_sample[:,0:68].copy()
+    train_sample_y_corner=train_sample[:,[-4,-3]].copy()
+    cv_sample_y_corner=cv_sample[:,[-4,-3]].copy()
+    test_sample_y_corner=test_sample[:,[-4,-3]].copy()
+    train_sample_y_goal=train_sample[:,[-2,-1]].copy()
+    cv_sample_y_goal=cv_sample[:,[-2,-1]].copy()
+    test_sample_y_goal=test_sample[:,[-2,-1]].copy()
+    train_sample_x=train_sample[:,0:-4].copy()
+    cv_sample_x=cv_sample[:,0:-4].copy()
+    test_sample_x=test_sample[:,0:-4].copy()
 
     return train_sample_x,cv_sample_x,test_sample_x,train_sample_y_corner,cv_sample_y_corner,test_sample_y_corner,train_sample_y_goal,cv_sample_y_goal,test_sample_y_goal
 train_x,cv_x,test_x,train_y_corner,cv_y_corner,test_y_corner,train_y_goal,cv_y_goal,test_y_goal=splitdata()
-np.where(train_y_corner>10,10,train_y_corner)
-np.where(cv_y_corner>10,10,cv_y_corner)
-np.where(test_y_corner>10,10,test_y_corner)
+
+np.where(train_y_corner>8,8,train_y_corner)
+np.where(cv_y_corner>8,8,cv_y_corner)
+np.where(test_y_corner>8,8,test_y_corner)
 train_y_corner_home=train_y_corner[:,0:1]
 train_y_corner_away=train_y_corner[:,1:2]
 train_y_goal_home=train_y_goal[:,0:1]
@@ -71,6 +72,14 @@ test_y_corner_home=test_y_corner[:,0:1]
 test_y_corner_away=test_y_corner[:,1:2]
 test_y_goal_home=test_y_goal[:,0:1]
 test_y_goal_away=test_y_goal[:,1:2]
+
+selectKBest = SelectKBest(f_regression, k=numfeature)#筛选特征
+best=selectKBest.fit_transform(train_x,train_y_goal_away+train_y_goal_home)
+print(selectKBest.get_support())
+train_x=train_x[:,selectKBest.get_support()]
+cv_x=cv_x[:,selectKBest.get_support()]
+test_x=test_x[:,selectKBest.get_support()]
+
 def transferlabel(list):
     for i in range(len(list)):
         if(list[i]>0):
@@ -90,8 +99,8 @@ test_cornerwinner=transferlabel(test_cornerwinner)
 
 
 initial_learning_rate=0.01
-l1=5
-l2=5
+l1=0.5
+l2=0.5
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate=initial_learning_rate,
     decay_steps=500,
@@ -108,13 +117,22 @@ test_accuracy=tf.keras.metrics.SparseCategoricalAccuracy()
 def create_sequential_model():
     model = tf.keras.models.Sequential()
     # Add layers
-    model.add(tf.keras.layers.BatchNormalization(input_shape=(68,)))
-    model.add(tf.keras.layers.Dense(16, activation="relu",kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1,l2=l2),use_bias=True))
-    model.add(tf.keras.layers.Dense(16, activation="relu", kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1, l2=l2),use_bias=True))
+    model.add(tf.keras.layers.Dense(16,kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1,l2=l2),use_bias=True,input_shape=(numfeature,)))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Activation(tf.keras.activations.relu))
+    model.add(tf.keras.layers.Dense(32, kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1, l2=l2),use_bias=True))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Activation(tf.keras.activations.relu))
+    model.add(tf.keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1, l2=l2),use_bias=True))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Activation(tf.keras.activations.relu))
+    model.add(tf.keras.layers.Dense(16, kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1, l2=l2),use_bias=True))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Activation(tf.keras.activations.relu))
     model.add(tf.keras.layers.Dense(1,kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1, l2=l2),use_bias=True))
     model.summary()
     return model
-cost=tf.keras.losses.MeanAbsoluteError()
+cost=tf.keras.losses.MeanSquaredError()
 mean=tf.keras.metrics.Mean()
 homemodel=create_sequential_model()
 homemodel.compile(
@@ -130,13 +148,13 @@ awaymodel.compile(
 )
 totalmodel=create_sequential_model()
 totalmodel.compile(
-    loss=tf.keras.losses.SparseCategoricalCrossentropy() ,
+    loss=tf.keras.losses.MeanAbsoluteError(),
     optimizer=optimizer,
     metrics=["accuracy"]
 )
 totalgoalmodel=create_sequential_model()
 totalgoalmodel.compile(
-    loss=tf.keras.losses.SparseCategoricalCrossentropy() ,
+    loss=tf.keras.losses.MeanSquaredError(),
     optimizer=optimizer,
     metrics=["accuracy"]
 )
@@ -149,7 +167,7 @@ cornermodel.compile(
 def train_step(inputs, targets,model):
     global train_loss
     with tf.GradientTape() as tape:
-        predictions = model(inputs)
+        predictions = model(inputs,training=True)
         loss = cost(targets, predictions)
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
@@ -157,7 +175,7 @@ def train_step(inputs, targets,model):
     del tape
 def validate_step(inputs_valid, targets_valid,model):
     global cv_loss
-    predictions = model(inputs_valid)
+    predictions = model(inputs_valid,training=False)
     loss = cost(targets_valid, predictions)
     cv_loss=loss
 
@@ -183,7 +201,8 @@ def train_model(inputs, targets, inputs_valid, targets_valid,model,epochs):
     plt.show()
 def model_eval(inputs_test, targets_test,model):
     global test_loss
-    predictions = model(inputs_test)
+    predictions = model(inputs_test,training=False)
+    pprint.pprint(predictions)
     loss = cost(targets_test, predictions)
     test_loss=loss
     print("Test Loss:"+str(test_loss))
@@ -197,9 +216,20 @@ def train_model_fit(x,y,model,epoch,cvx,cvy):
 
 #train_model_fit(train_x,train_cornerwinner,cornermodel,500,cv_x,cv_cornerwinner)
 #print(cornermodel.evaluate(test_x,test_cornerwinner))
-train_model(train_x,train_y_corner_home+train_y_corner_away,cv_x,cv_y_corner_home+cv_y_corner_away,totalmodel,5000)
-model_eval(test_x,test_y_corner_away+test_y_corner_home,totalmodel)
-totalmodel.save("AItotal Zscore.h5")
+
+train_model(train_x,train_y_goal_home+train_y_goal_away,cv_x,cv_y_goal_home+cv_y_goal_away,totalgoalmodel,6000)
+model_eval(test_x,test_y_goal_away+test_y_goal_home,totalgoalmodel)
+totalgoalmodel.save("AItotalgoal Zscore.h5")
+
+
+totalgoalmodel=tf.keras.models.load_model('/Users/kiddgu/PycharmProjects/CornerPrediction/AItotalgoal Zscore.h5')
+prediction=totalgoalmodel(test_x,training=False)
+prediction=prediction.numpy()
+pprint.pprint(prediction.shape)
+a,b,c=plt.hist((prediction-(test_y_goal_away+test_y_goal_home)),bins=[-0.5,0,0.5])
+print(sum(a)/868)
+plt.show()
+
 '''
 
 
